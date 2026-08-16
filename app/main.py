@@ -17,6 +17,7 @@ from app.api.middleware import request_context_middleware
 from app.api.router import router
 from app.application.document_processing import DocumentProcessingService
 from app.application.documents import DocumentService
+from app.application.rag import RagService
 from app.application.tender_analysis import RelevantChunkSelector, TenderAnalysisService
 from app.application.text_chunking import MeaningfulTextChunker
 from app.application.vector_search import VectorSearchService
@@ -24,6 +25,7 @@ from app.config import LlmProvider, Settings, get_settings
 from app.domain.exceptions import ApplicationError
 from app.infrastructure.database import Database, DatabaseGateway
 from app.infrastructure.database.document_repository import SqlAlchemyDocumentRepository
+from app.infrastructure.database.question_repository import SqlAlchemyQuestionRepository
 from app.infrastructure.database.tender_analysis_repository import (
     SqlAlchemyTenderAnalysisRepository,
 )
@@ -45,6 +47,7 @@ def create_app(
     document_processor = None
     tender_analysis_service = None
     vector_search_service = None
+    rag_service = None
     if isinstance(resolved_database, Database):
         document_repository = SqlAlchemyDocumentRepository(resolved_database)
         document_storage = LocalDocumentStorage(resolved_settings.storage_path)
@@ -98,6 +101,13 @@ def create_app(
             embedding_provider,
             top_k=resolved_settings.rag_top_k,
         )
+        rag_service = RagService(
+            document_repository,
+            vector_search_service,
+            SqlAlchemyQuestionRepository(resolved_database),
+            analysis_provider,
+            min_relevance=resolved_settings.rag_min_relevance,
+        )
     configure_logging(resolved_settings.log_level)
     logger = structlog.get_logger(__name__)
 
@@ -131,6 +141,7 @@ def create_app(
     application.state.document_processor = document_processor
     application.state.tender_analysis_service = tender_analysis_service
     application.state.vector_search_service = vector_search_service
+    application.state.rag_service = rag_service
     application.state.lifecycle_started = False
     application.state.ready = False
     application.middleware("http")(request_context_middleware)

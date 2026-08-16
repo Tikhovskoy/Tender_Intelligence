@@ -49,6 +49,7 @@ services:
       APP_EMBEDDING_MODEL: ${APP_EMBEDDING_MODEL:-text-embedding-3-small}
       APP_EMBEDDING_BATCH_SIZE: ${APP_EMBEDDING_BATCH_SIZE:-32}
       APP_RAG_TOP_K: ${APP_RAG_TOP_K:-5}
+      APP_RAG_MIN_RELEVANCE: ${APP_RAG_MIN_RELEVANCE:-0.15}
     depends_on:
       postgres:
         condition: service_healthy

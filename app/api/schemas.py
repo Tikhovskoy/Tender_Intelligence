@@ -4,7 +4,9 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.domain.rag import RagAnswer
 
 
 class HealthResponse(BaseModel):
@@ -59,3 +61,19 @@ class DocumentListResponse(BaseModel):
     items: list[DocumentResponse]
     limit: int
     offset: int
+
+
+class QuestionRequest(BaseModel):
+    """Вопрос пользователя по одному документу."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    question: str = Field(min_length=1, max_length=2000)
+
+
+class QuestionListResponse(BaseModel):
+    """Последние ответы по документу."""
+
+    model_config = ConfigDict(frozen=True)
+
+    items: list[RagAnswer]

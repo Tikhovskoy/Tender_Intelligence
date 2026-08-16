@@ -59,7 +59,7 @@ async def validation_error_handler(
     errors: list[dict[str, Any]] = jsonable_encoder(validation_error.errors())
     await logger.awarning("request_validation_error", errors=errors)
     return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         content={
             "detail": "Некорректные данные запроса",
             "code": "request_validation_error",

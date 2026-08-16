@@ -4,6 +4,7 @@ from fastapi import Request
 
 from app.application.document_processing import DocumentProcessingService
 from app.application.documents import DocumentService
+from app.application.rag import RagService
 from app.application.tender_analysis import TenderAnalysisService
 
 
@@ -26,4 +27,12 @@ def get_tender_analysis_service(request: Request) -> TenderAnalysisService:
     service = getattr(request.app.state, "tender_analysis_service", None)
     if not isinstance(service, TenderAnalysisService):
         raise RuntimeError("Сервис анализа тендера не настроен")
+    return service
+
+
+def get_rag_service(request: Request) -> RagService:
+    """Вернуть настроенный сервис вопросов по документу."""
+    service = getattr(request.app.state, "rag_service", None)
+    if not isinstance(service, RagService):
+        raise RuntimeError("Сервис вопросов не настроен")
     return service

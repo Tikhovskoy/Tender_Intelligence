@@ -11,6 +11,7 @@ from app.domain.documents import (
     TextChunk,
     VectorSearchResult,
 )
+from app.domain.rag import GroundedAnswerDraft, RagAnswer, RagSource
 from app.domain.tender import AnalysisChunk, TenderCard
 
 
@@ -186,3 +187,37 @@ class InMemoryTenderAnalysisRepository:
         self.cards[document_id] = card
         self.saved_metadata = (provider, model, prompt_version)
         return card
+
+
+class InMemoryQuestionRepository:
+    """История вопросов без внешней БД."""
+
+    def __init__(self) -> None:
+        self.answers: list[RagAnswer] = []
+        self.saved_metadata: tuple[str, str] | None = None
+
+    async def save(
+        self,
+        document_id: UUID,
+        question: str,
+        draft: GroundedAnswerDraft,
+        sources: Sequence[RagSource],
+        *,
+        provider: str,
+        model: str,
+    ) -> RagAnswer:
+        answer = RagAnswer(
+            id=uuid4(),
+            document_id=document_id,
+            question=question,
+            answer=draft.answer,
+            context_sufficient=draft.context_sufficient,
+            sources=list(sources),
+            created_at=datetime.now(UTC),
+        )
+        self.answers.insert(0, answer)
+        self.saved_metadata = (provider, model)
+        return answer
+
+    async def list(self, document_id: UUID, *, limit: int) -> Sequence[RagAnswer]:
+        return [answer for answer in self.answers if answer.document_id == document_id][:limit]
