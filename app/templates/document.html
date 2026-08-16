@@ -21,7 +21,7 @@
   <section class="section-block" aria-labelledby="analysis-heading">
     <div class="section-heading action-heading">
       <div><span class="eyebrow">Основные сведения</span><h2 id="analysis-heading">Карточка тендера</h2></div>
-      {% if document.status.value == "ready" and not analysis %}
+      {% if document.status.value == "ready" %}
         <button
           class="button button-secondary"
           hx-post="/documents/{{ document.id }}/analysis"
@@ -29,7 +29,7 @@
           hx-swap="innerHTML"
           hx-indicator="#analysis-indicator"
         >
-          Сформировать карточку
+          {% if analysis %}Обновить карточку{% else %}Сформировать карточку{% endif %}
           <span id="analysis-indicator" class="htmx-indicator spinner spinner-dark"></span>
         </button>
       {% endif %}

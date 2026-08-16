@@ -7,7 +7,7 @@
   <p class="answer-text">{{ answer.answer }}</p>
   {% if answer.sources %}
     <details class="sources">
-      <summary>Источники ответа — {{ answer.sources | length }}</summary>
+      <summary>{% if answer.context_sufficient %}Источники ответа{% else %}Найденные фрагменты{% endif %} — {{ answer.sources | length }}</summary>
       <div class="source-list">
         {% for source in answer.sources %}
           <blockquote>

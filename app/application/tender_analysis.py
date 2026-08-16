@@ -20,7 +20,7 @@ from app.domain.tender import (
     TenderCard,
 )
 
-PROMPT_VERSION = "1"
+PROMPT_VERSION = "2"
 
 
 class RelevantChunkSelector:

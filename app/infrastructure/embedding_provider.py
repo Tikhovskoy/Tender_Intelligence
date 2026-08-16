@@ -31,24 +31,41 @@ class OpenAICompatibleEmbeddingProvider:
     async def embed_documents(self, texts: Sequence[str]) -> Sequence[Sequence[float]]:
         vectors: list[list[float]] = []
         for start in range(0, len(texts), self.batch_size):
-            vectors.extend(await self._embed(texts[start : start + self.batch_size]))
+            vectors.extend(
+                await self._embed(
+                    texts[start : start + self.batch_size],
+                    input_type="passage",
+                )
+            )
         return vectors
 
     async def embed_query(self, text: str) -> Sequence[float]:
-        vectors = await self._embed([text])
+        vectors = await self._embed([text], input_type="query")
         return vectors[0]
 
-    async def _embed(self, texts: Sequence[str]) -> list[list[float]]:
+    async def _embed(
+        self,
+        texts: Sequence[str],
+        *,
+        input_type: str,
+    ) -> list[list[float]]:
         try:
-            response = await self.client.embeddings.create(
-                model=self.model,
-                input=list(texts),
-            )
+            if "nv-embedqa" in self.model.casefold():
+                response = await self.client.embeddings.create(
+                    model=self.model,
+                    input=list(texts),
+                    extra_body={"input_type": input_type, "truncate": "END"},
+                )
+            else:
+                response = await self.client.embeddings.create(
+                    model=self.model,
+                    input=list(texts),
+                )
         except BadRequestError as error:
             if len(texts) > 1:
                 middle = len(texts) // 2
-                left = await self._embed(texts[:middle])
-                right = await self._embed(texts[middle:])
+                left = await self._embed(texts[:middle], input_type=input_type)
+                right = await self._embed(texts[middle:], input_type=input_type)
                 return [*left, *right]
             raise InvalidProviderResponseError(
                 "Embedding-модель отклонила фрагмент документа",

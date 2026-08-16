@@ -122,7 +122,7 @@ async def test_service_saves_validated_card() -> None:
 
     assert result.contract_amount.value == "100 000"
     assert provider.received_chunks[0].page_number == 1
-    assert analyses.saved_metadata == ("stub", "stub-model", "1")
+    assert analyses.saved_metadata == ("stub", "stub-model", "2")
     assert await service.get(document.id) == result
 
 

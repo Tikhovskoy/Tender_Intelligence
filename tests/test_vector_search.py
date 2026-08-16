@@ -1,10 +1,16 @@
 from collections.abc import Sequence
-from uuid import NAMESPACE_URL, uuid5
+from uuid import NAMESPACE_URL, uuid4, uuid5
 
 import pytest
 
 from app.application.vector_search import VectorSearchService
-from app.domain.documents import DocumentRecord, ExtractedPage, StoredDocument, TextChunk
+from app.domain.documents import (
+    DocumentRecord,
+    ExtractedPage,
+    StoredDocument,
+    TextChunk,
+    VectorSearchResult,
+)
 from app.domain.exceptions import ProviderUnavailableError
 from tests.fakes import InMemoryDocumentRepository
 
@@ -92,3 +98,29 @@ async def test_search_reports_missing_embedding_provider() -> None:
         await service.search(document.id, "Какова цена?")
 
     assert error.value.code == "embedding_provider_not_configured"
+
+
+def test_reranking_promotes_exact_experience_requirement() -> None:
+    candidates = [
+        VectorSearchResult(
+            id=uuid4(),
+            chunk_index=1,
+            page_number=7,
+            text="Исполнитель обеспечивает техническую поддержку системы.",
+            relevance=0.82,
+        ),
+        VectorSearchResult(
+            id=uuid4(),
+            chunk_index=2,
+            page_number=3,
+            text="Опыт работы на рынке не менее 1 года.",
+            relevance=0.79,
+        ),
+    ]
+
+    results = VectorSearchService._rerank(
+        "Опыт работы на рынке исполнителя?",
+        candidates,
+    )
+
+    assert results[0].page_number == 3
