@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 
-from openai import AsyncOpenAI, OpenAIError
+from openai import AsyncOpenAI, BadRequestError, OpenAIError
 
 from app.domain.exceptions import InvalidProviderResponseError, ProviderUnavailableError
 
@@ -44,6 +44,16 @@ class OpenAICompatibleEmbeddingProvider:
                 model=self.model,
                 input=list(texts),
             )
+        except BadRequestError as error:
+            if len(texts) > 1:
+                middle = len(texts) // 2
+                left = await self._embed(texts[:middle])
+                right = await self._embed(texts[middle:])
+                return [*left, *right]
+            raise InvalidProviderResponseError(
+                "Embedding-модель отклонила фрагмент документа",
+                code="embedding_request_rejected",
+            ) from error
         except OpenAIError as error:
             raise ProviderUnavailableError(
                 "Провайдер embeddings временно недоступен",

@@ -60,6 +60,25 @@ async def list_documents(
     )
 
 
+@router.post(
+    "/{document_id}/retry",
+    response_model=DocumentResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErrorResponse}},
+)
+async def retry_document_processing(
+    document_id: UUID,
+    processor: DocumentProcessorDependency,
+    background_tasks: BackgroundTasks,
+) -> DocumentResponse:
+    """Повторно запустить обработку документа после ошибки."""
+    if processor is None:
+        raise RuntimeError("Сервис обработки документов не настроен")
+    record = await processor.prepare_retry(document_id)
+    background_tasks.add_task(processor.process, document_id)
+    return DocumentResponse.model_validate(record)
+
+
 @router.get(
     "/{document_id}",
     response_model=DocumentResponse,

@@ -113,3 +113,29 @@ async def test_processing_adds_embeddings_to_chunks(tmp_path: Path) -> None:
     chunk = repository.chunks[document.id][0]
     assert chunk.embedding == [1.0, 0.0]
     assert chunk.embedding_model == "fake-embedding"
+
+
+async def test_failed_document_can_be_prepared_and_processed_again(tmp_path: Path) -> None:
+    repository = InMemoryDocumentRepository()
+    storage = LocalDocumentStorage(tmp_path)
+    document = await upload_document(repository, storage)
+    await repository.mark_failed(
+        document.id,
+        code="embedding_provider_unavailable",
+        message="Провайдер временно недоступен",
+    )
+    processor = DocumentProcessingService(
+        repository,
+        storage,
+        StaticExtractor([ExtractedPage(page_number=1, text="Условия контракта")]),
+        MeaningfulTextChunker(max_chars=100, overlap_chars=10),
+    )
+
+    prepared = await processor.prepare_retry(document.id)
+    await processor.process(document.id)
+
+    updated = await repository.get(document.id)
+    assert prepared.status == "processing"
+    assert prepared.error_message is None
+    assert updated is not None
+    assert updated.status == "ready"

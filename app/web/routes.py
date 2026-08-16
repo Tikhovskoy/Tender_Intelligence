@@ -186,6 +186,32 @@ async def document_status(
     return response
 
 
+@router.post("/documents/{document_id}/retry", response_class=HTMLResponse)
+async def retry_document_processing(
+    request: Request,
+    document_id: UUID,
+    background_tasks: BackgroundTasks,
+    processor: DocumentProcessorDependency,
+) -> Response:
+    """Повторно запустить обработку и сразу показать ожидание."""
+    if processor is None:
+        return templates.TemplateResponse(
+            request=request,
+            name="partials/error.html",
+            context=_context(request, error="Сервис обработки документов не настроен"),
+        )
+    try:
+        document = await processor.prepare_retry(document_id)
+    except ApplicationError as error:
+        return _error_response(request, error)
+    background_tasks.add_task(processor.process, document_id)
+    return templates.TemplateResponse(
+        request=request,
+        name="partials/status.html",
+        context=_context(request, document=document),
+    )
+
+
 @router.post("/documents/{document_id}/analysis", response_class=HTMLResponse)
 async def analyze_document(
     request: Request,

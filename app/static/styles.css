@@ -102,6 +102,8 @@ h3 { line-height: 1.3; }
 .status-panel { display: flex; gap: 15px; align-items: center; padding: 17px 19px; border: 1px solid; border-radius: 14px; }
 .status-panel strong, .status-panel p { display: block; }
 .status-panel p { margin: 2px 0 0; color: var(--muted); }
+.status-content { flex: 1; }
+.status-action { margin-top: 12px; }
 .status-panel-ready { border-color: #addfd9; background: var(--teal-soft); }
 .status-panel-uploaded, .status-panel-processing { border-color: #f0d49c; background: var(--amber-soft); }
 .status-panel-failed { border-color: #f4c4c0; background: var(--red-soft); }

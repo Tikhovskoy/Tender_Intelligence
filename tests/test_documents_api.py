@@ -12,7 +12,7 @@ from app.domain.documents import ExtractedPage
 from app.infrastructure.document_storage import LocalDocumentStorage
 from tests.fakes import InMemoryDocumentRepository
 from tests.test_document_processing import StaticExtractor
-from tests.test_document_storage import PDF_CONTENT
+from tests.test_document_storage import PDF_CONTENT, MemoryReader
 
 
 def configure_service(application: FastAPI, tmp_path: Path, *, max_size: int = 1024) -> None:
@@ -134,3 +134,43 @@ async def test_upload_starts_background_processing(
     assert upload_response.json()["status"] == "uploaded"
     assert get_response.json()["status"] == "ready"
     assert get_response.json()["page_count"] == 1
+
+
+async def test_api_retries_failed_document(
+    application: FastAPI,
+    client: AsyncClient,
+    tmp_path: Path,
+) -> None:
+    repository = InMemoryDocumentRepository()
+    storage = LocalDocumentStorage(tmp_path)
+    service = DocumentService(
+        repository,
+        storage,
+        max_size_bytes=1024,
+        chunk_size_bytes=8,
+    )
+    document = await service.upload(
+        MemoryReader(PDF_CONTENT),
+        filename="тендер.pdf",
+        content_type="application/pdf",
+    )
+    await repository.mark_failed(
+        document.id,
+        code="embedding_provider_unavailable",
+        message="Провайдер временно недоступен",
+    )
+    processor = DocumentProcessingService(
+        repository,
+        storage,
+        StaticExtractor([ExtractedPage(page_number=1, text="Условия контракта")]),
+        MeaningfulTextChunker(max_chars=100, overlap_chars=10),
+    )
+    application.dependency_overrides[get_document_service] = lambda: service
+    application.dependency_overrides[get_document_processor] = lambda: processor
+
+    response = await client.post(f"/api/v1/documents/{document.id}/retry")
+    current = await client.get(f"/api/v1/documents/{document.id}")
+
+    assert response.status_code == 202
+    assert response.json()["status"] == "processing"
+    assert current.json()["status"] == "ready"

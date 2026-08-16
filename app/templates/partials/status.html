@@ -12,7 +12,7 @@
     {% elif document.status.value == "ready" %}✓
     {% else %}!{% endif %}
   </div>
-  <div>
+  <div class="status-content">
     <strong>
       {% if document.status.value == "uploaded" %}Документ ожидает обработки
       {% elif document.status.value == "processing" %}Извлекаем текст и подготавливаем поиск
@@ -24,5 +24,14 @@
       {% elif document.status.value == "ready" %}Можно сформировать карточку и задавать вопросы.
       {% else %}{{ document.error_message or "Повторите загрузку или выберите другой PDF." }}{% endif %}
     </p>
+    {% if document.status.value == "failed" %}
+      <button
+        class="button button-secondary status-action"
+        type="button"
+        hx-post="/documents/{{ document.id }}/retry"
+        hx-target="#document-status"
+        hx-swap="outerHTML"
+      >Повторить обработку</button>
+    {% endif %}
   </div>
 </div>
