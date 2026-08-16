@@ -124,3 +124,29 @@ def test_reranking_promotes_exact_experience_requirement() -> None:
     )
 
     assert results[0].page_number == 3
+
+
+def test_reranking_understands_experience_synonym() -> None:
+    candidates = [
+        VectorSearchResult(
+            id=uuid4(),
+            chunk_index=1,
+            page_number=8,
+            text="Подрядчик оказывает техническую поддержку.",
+            relevance=0.82,
+        ),
+        VectorSearchResult(
+            id=uuid4(),
+            chunk_index=2,
+            page_number=3,
+            text="Опыт работы на рынке не менее 1 года.",
+            relevance=0.76,
+        ),
+    ]
+
+    results = VectorSearchService._rerank(
+        "Какой минимальный стаж требуется от подрядчика?",
+        candidates,
+    )
+
+    assert results[0].page_number == 3

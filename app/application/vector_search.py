@@ -68,6 +68,15 @@ class VectorSearchService:
             "поставщику",
         }
     )
+    _EXPERIENCE_TERMS = frozenset(
+        {
+            "опыт",
+            "стаж",
+            "стажа",
+            "стажем",
+        }
+    )
+    _EXPERIENCE_SYNONYMS = frozenset({"опыт", "стаж", "работа", "работы", "рынок", "рынке"})
 
     async def search(self, document_id: UUID, question: str) -> Sequence[VectorSearchResult]:
         normalized_question = question.strip()
@@ -108,8 +117,8 @@ class VectorSearchService:
 
         def score(item: VectorSearchResult) -> tuple[float, float, int]:
             text_terms = cls._terms(item.text)
-            lexical_share = len(query_terms & text_terms) / max(1, len(query_terms))
-            combined = item.relevance + min(0.3, lexical_share * 0.5)
+            lexical_hits = len(query_terms & text_terms)
+            combined = item.relevance + min(0.4, lexical_hits * 0.08)
             return combined, item.relevance, -item.chunk_index
 
         return sorted(candidates, key=score, reverse=True)
@@ -127,4 +136,6 @@ class VectorSearchService:
         terms = cls._terms(question)
         if terms & cls._CONTRACTOR_TERMS:
             terms |= cls._CONTRACTOR_TERMS | cls._CONTRACTOR_SYNONYMS
+        if terms & cls._EXPERIENCE_TERMS:
+            terms |= cls._EXPERIENCE_SYNONYMS
         return terms
