@@ -3,10 +3,14 @@ from httpx import ASGITransport, AsyncClient
 from app.config import Environment, Settings
 from app.domain.exceptions import ApplicationError
 from app.main import create_app
+from tests.fakes import FakeDatabase
 
 
 async def test_application_error_has_safe_response() -> None:
-    application = create_app(Settings(environment=Environment.TEST, log_level="CRITICAL"))
+    application = create_app(
+        Settings(environment=Environment.TEST, log_level="CRITICAL"),
+        database=FakeDatabase(),
+    )
 
     @application.get("/expected-error")
     async def expected_error() -> None:
@@ -28,7 +32,10 @@ async def test_application_error_has_safe_response() -> None:
 
 
 async def test_unexpected_error_does_not_expose_details() -> None:
-    application = create_app(Settings(environment=Environment.TEST, log_level="CRITICAL"))
+    application = create_app(
+        Settings(environment=Environment.TEST, log_level="CRITICAL"),
+        database=FakeDatabase(),
+    )
 
     @application.get("/unexpected-error")
     async def unexpected_error() -> None:

@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 
 from app import __version__
 from app.api.schemas import HealthResponse, ReadinessResponse
+from app.infrastructure.database import DatabaseGateway
 
 router = APIRouter(prefix="/health", tags=["Состояние сервиса"])
 
@@ -22,7 +23,11 @@ async def liveness() -> HealthResponse:
 )
 async def readiness(request: Request) -> ReadinessResponse | JSONResponse:
     """Подтвердить готовность приложения обслуживать запросы."""
-    if bool(getattr(request.app.state, "ready", False)):
+    database: DatabaseGateway = request.app.state.database
+    lifecycle_started = bool(getattr(request.app.state, "lifecycle_started", False))
+    database_ready = lifecycle_started and await database.is_ready()
+    request.app.state.ready = database_ready
+    if database_ready:
         return ReadinessResponse(status="ready")
     payload = ReadinessResponse(status="not_ready")
     return JSONResponse(

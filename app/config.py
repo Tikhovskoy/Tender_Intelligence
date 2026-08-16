@@ -3,7 +3,7 @@
 from enum import StrEnum
 from functools import lru_cache
 
-from pydantic import Field, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -32,6 +32,13 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = Field(default=8000, ge=1, le=65535)
     log_level: str = "INFO"
+    database_url: SecretStr = SecretStr(
+        "postgresql+asyncpg://tender:tender@localhost:5432/tender_intelligence"
+    )
+    database_echo: bool = False
+    database_pool_size: int = Field(default=5, ge=1, le=50)
+    database_pool_timeout: int = Field(default=30, ge=1, le=300)
+    database_connect_timeout: float = Field(default=5.0, gt=0, le=60)
 
     @field_validator("log_level")
     @classmethod

@@ -17,27 +17,36 @@ from app.api.middleware import request_context_middleware
 from app.api.router import router
 from app.config import Settings, get_settings
 from app.domain.exceptions import ApplicationError
+from app.infrastructure.database import Database, DatabaseGateway
 from app.logging_config import configure_logging
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    database: DatabaseGateway | None = None,
+) -> FastAPI:
     """Создать и настроить экземпляр приложения."""
     resolved_settings = settings or get_settings()
+    resolved_database = database or Database(resolved_settings)
     configure_logging(resolved_settings.log_level)
     logger = structlog.get_logger(__name__)
 
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
-        application.state.ready = True
+        application.state.lifecycle_started = True
+        application.state.ready = await resolved_database.connect()
         await logger.ainfo(
             "application_started",
             environment=resolved_settings.environment.value,
+            database_ready=application.state.ready,
             version=__version__,
         )
         try:
             yield
         finally:
             application.state.ready = False
+            application.state.lifecycle_started = False
+            await resolved_database.disconnect()
             await logger.ainfo("application_stopped")
 
     application = FastAPI(
@@ -47,6 +56,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     application.state.settings = resolved_settings
+    application.state.database = resolved_database
+    application.state.lifecycle_started = False
     application.state.ready = False
     application.middleware("http")(request_context_middleware)
     application.add_exception_handler(ApplicationError, application_error_handler)
