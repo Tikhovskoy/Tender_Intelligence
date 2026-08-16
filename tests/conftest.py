@@ -1,6 +1,7 @@
 from collections.abc import AsyncIterator
 
 import pytest
+from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
 from app.config import Environment, Settings
@@ -9,9 +10,13 @@ from tests.fakes import FakeDatabase
 
 
 @pytest.fixture
-async def client() -> AsyncIterator[AsyncClient]:
+def application() -> FastAPI:
     settings = Settings(environment=Environment.TEST, log_level="CRITICAL")
-    application = create_app(settings, database=FakeDatabase())
+    return create_app(settings, database=FakeDatabase())
+
+
+@pytest.fixture
+async def client(application: FastAPI) -> AsyncIterator[AsyncClient]:
     transport = ASGITransport(app=application)
     async with (
         application.router.lifespan_context(application),

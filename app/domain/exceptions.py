@@ -8,3 +8,15 @@ class ApplicationError(Exception):
         super().__init__(message)
         self.message = message
         self.code = code
+
+
+class InvalidDocumentError(ApplicationError):
+    """Файл не соответствует требованиям к документу."""
+
+
+class FileTooLargeError(ApplicationError):
+    """Размер файла превышает допустимый предел."""
+
+
+class DocumentNotFoundError(ApplicationError):
+    """Документ с указанным идентификатором не найден."""

@@ -2,6 +2,7 @@
 
 from enum import StrEnum
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -39,6 +40,14 @@ class Settings(BaseSettings):
     database_pool_size: int = Field(default=5, ge=1, le=50)
     database_pool_timeout: int = Field(default=30, ge=1, le=300)
     database_connect_timeout: float = Field(default=5.0, gt=0, le=60)
+    storage_path: Path = Path("storage/uploads")
+    upload_max_size_mb: int = Field(default=25, ge=1, le=500)
+    upload_chunk_size_bytes: int = Field(default=1024 * 1024, ge=64 * 1024, le=8 * 1024 * 1024)
+
+    @property
+    def upload_max_size_bytes(self) -> int:
+        """Вернуть ограничение размера загружаемого файла в байтах."""
+        return self.upload_max_size_mb * 1024 * 1024
 
     @field_validator("log_level")
     @classmethod
