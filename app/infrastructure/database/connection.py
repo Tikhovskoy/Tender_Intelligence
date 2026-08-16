@@ -42,7 +42,7 @@ class Database:
         try:
             async with self.engine.connect() as connection:
                 await connection.execute(text("SELECT 1"))
-        except SQLAlchemyError:
+        except (OSError, SQLAlchemyError):
             return False
         return True
 
