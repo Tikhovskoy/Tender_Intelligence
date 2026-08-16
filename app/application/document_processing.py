@@ -1,5 +1,6 @@
 """Сценарий извлечения текста из загруженного документа."""
 
+from dataclasses import replace
 from uuid import UUID
 
 import structlog
@@ -9,6 +10,7 @@ from app.domain.documents import (
     DocumentRepository,
     DocumentStorage,
     DocumentTextExtractor,
+    EmbeddingProvider,
 )
 from app.domain.exceptions import ApplicationError
 
@@ -24,11 +26,13 @@ class DocumentProcessingService:
         storage: DocumentStorage,
         extractor: DocumentTextExtractor,
         chunker: DocumentChunker,
+        embedding_provider: EmbeddingProvider | None = None,
     ) -> None:
         self.repository = repository
         self.storage = storage
         self.extractor = extractor
         self.chunker = chunker
+        self.embedding_provider = embedding_provider
 
     async def process(self, document_id: UUID) -> None:
         """Извлечь текст, не допуская падения фонового сценария."""
@@ -41,7 +45,21 @@ class DocumentProcessingService:
         try:
             path = self.storage.resolve_path(document.stored_filename)
             pages = await self.extractor.extract(path)
-            chunks = self.chunker.split(pages)
+            chunks = list(self.chunker.split(pages))
+            if self.embedding_provider is not None and chunks:
+                vectors = await self.embedding_provider.embed_documents(
+                    [chunk.text for chunk in chunks]
+                )
+                if len(vectors) != len(chunks):
+                    raise RuntimeError("Провайдер вернул неверное количество векторов")
+                chunks = [
+                    replace(
+                        chunk,
+                        embedding=list(vector),
+                        embedding_model=self.embedding_provider.model,
+                    )
+                    for chunk, vector in zip(chunks, vectors, strict=True)
+                ]
             await self.repository.save_content(document_id, pages, chunks)
         except ApplicationError as error:
             await self.repository.mark_failed(

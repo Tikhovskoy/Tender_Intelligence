@@ -19,6 +19,7 @@ from app.application.document_processing import DocumentProcessingService
 from app.application.documents import DocumentService
 from app.application.tender_analysis import RelevantChunkSelector, TenderAnalysisService
 from app.application.text_chunking import MeaningfulTextChunker
+from app.application.vector_search import VectorSearchService
 from app.config import LlmProvider, Settings, get_settings
 from app.domain.exceptions import ApplicationError
 from app.infrastructure.database import Database, DatabaseGateway
@@ -27,6 +28,7 @@ from app.infrastructure.database.tender_analysis_repository import (
     SqlAlchemyTenderAnalysisRepository,
 )
 from app.infrastructure.document_storage import LocalDocumentStorage
+from app.infrastructure.embedding_provider import OpenAICompatibleEmbeddingProvider
 from app.infrastructure.llm_provider import OpenAICompatibleTenderProvider
 from app.infrastructure.pdf_text_extractor import PyMuPdfTextExtractor
 from app.logging_config import configure_logging
@@ -42,9 +44,21 @@ def create_app(
     document_service = None
     document_processor = None
     tender_analysis_service = None
+    vector_search_service = None
     if isinstance(resolved_database, Database):
         document_repository = SqlAlchemyDocumentRepository(resolved_database)
         document_storage = LocalDocumentStorage(resolved_settings.storage_path)
+        api_key = resolved_settings.llm_api_key.get_secret_value()
+        provider_configured = resolved_settings.llm_provider == LlmProvider.OLLAMA or bool(api_key)
+        embedding_provider = None
+        if provider_configured:
+            embedding_provider = OpenAICompatibleEmbeddingProvider(
+                model=resolved_settings.embedding_model,
+                base_url=resolved_settings.llm_base_url,
+                api_key=api_key or "ollama",
+                timeout=resolved_settings.llm_timeout_seconds,
+                batch_size=resolved_settings.embedding_batch_size,
+            )
         document_service = DocumentService(
             document_repository,
             document_storage,
@@ -59,10 +73,10 @@ def create_app(
                 max_chars=resolved_settings.text_chunk_size_chars,
                 overlap_chars=resolved_settings.text_chunk_overlap_chars,
             ),
+            embedding_provider,
         )
-        api_key = resolved_settings.llm_api_key.get_secret_value()
         analysis_provider = None
-        if resolved_settings.llm_provider == LlmProvider.OLLAMA or api_key:
+        if provider_configured:
             analysis_provider = OpenAICompatibleTenderProvider(
                 name=resolved_settings.llm_provider.value,
                 model=resolved_settings.llm_model,
@@ -78,6 +92,11 @@ def create_app(
                 max_chunks=resolved_settings.analysis_context_max_chunks,
                 max_chars=resolved_settings.analysis_context_max_chars,
             ),
+        )
+        vector_search_service = VectorSearchService(
+            document_repository,
+            embedding_provider,
+            top_k=resolved_settings.rag_top_k,
         )
     configure_logging(resolved_settings.log_level)
     logger = structlog.get_logger(__name__)
@@ -111,6 +130,7 @@ def create_app(
     application.state.document_service = document_service
     application.state.document_processor = document_processor
     application.state.tender_analysis_service = tender_analysis_service
+    application.state.vector_search_service = vector_search_service
     application.state.lifecycle_started = False
     application.state.ready = False
     application.middleware("http")(request_context_middleware)

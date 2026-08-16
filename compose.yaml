@@ -46,6 +46,9 @@ services:
       APP_LLM_API_KEY: ${APP_LLM_API_KEY:-}
       APP_LLM_MODEL: ${APP_LLM_MODEL:-gpt-4o-mini}
       APP_LLM_TIMEOUT_SECONDS: ${APP_LLM_TIMEOUT_SECONDS:-60}
+      APP_EMBEDDING_MODEL: ${APP_EMBEDDING_MODEL:-text-embedding-3-small}
+      APP_EMBEDDING_BATCH_SIZE: ${APP_EMBEDDING_BATCH_SIZE:-32}
+      APP_RAG_TOP_K: ${APP_RAG_TOP_K:-5}
     depends_on:
       postgres:
         condition: service_healthy

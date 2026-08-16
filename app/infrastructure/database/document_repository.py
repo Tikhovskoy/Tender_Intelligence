@@ -11,6 +11,7 @@ from app.domain.documents import (
     ExtractedPage,
     StoredDocument,
     TextChunk,
+    VectorSearchResult,
 )
 from app.domain.tender import AnalysisChunk
 from app.infrastructure.database.connection import Database
@@ -102,6 +103,8 @@ class SqlAlchemyDocumentRepository:
                         text=chunk.text,
                         char_start=chunk.char_start,
                         char_end=chunk.char_end,
+                        embedding=chunk.embedding,
+                        embedding_model=chunk.embedding_model,
                         attributes={
                             "page_number": chunk.page_number,
                             "char_start": chunk.char_start,
@@ -146,6 +149,46 @@ class SqlAlchemyDocumentRepository:
             rows = (await session.execute(statement)).all()
         return [
             AnalysisChunk(chunk_index=row.chunk_index, page_number=row.page_number, text=row.text)
+            for row in rows
+        ]
+
+    async def search_similar(
+        self,
+        document_id: UUID,
+        query_embedding: Sequence[float],
+        *,
+        embedding_model: str,
+        limit: int,
+    ) -> Sequence[VectorSearchResult]:
+        """Выполнить cosine-поиск только по чанкам выбранного документа."""
+        distance = DocumentChunk.embedding.cosine_distance(list(query_embedding)).label("distance")
+        statement = (
+            select(
+                DocumentChunk.id,
+                DocumentChunk.chunk_index,
+                DocumentPage.page_number,
+                DocumentChunk.text,
+                distance,
+            )
+            .join(DocumentPage, DocumentPage.id == DocumentChunk.page_id)
+            .where(
+                DocumentChunk.document_id == document_id,
+                DocumentChunk.embedding.is_not(None),
+                DocumentChunk.embedding_model == embedding_model,
+            )
+            .order_by(distance)
+            .limit(limit)
+        )
+        async with self.database.session() as session:
+            rows = (await session.execute(statement)).all()
+        return [
+            VectorSearchResult(
+                id=row.id,
+                chunk_index=row.chunk_index,
+                page_number=row.page_number,
+                text=row.text,
+                relevance=max(-1.0, min(1.0, 1.0 - float(row.distance))),
+            )
             for row in rows
         ]
 

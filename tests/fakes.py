@@ -1,6 +1,7 @@
 from collections.abc import Sequence
 from datetime import UTC, datetime
-from uuid import UUID, uuid4
+from math import sqrt
+from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 from app.domain.documents import (
     DocumentRecord,
@@ -8,6 +9,7 @@ from app.domain.documents import (
     ExtractedPage,
     StoredDocument,
     TextChunk,
+    VectorSearchResult,
 )
 from app.domain.tender import AnalysisChunk, TenderCard
 
@@ -99,6 +101,41 @@ class InMemoryDocumentRepository:
             )
             for chunk in self.chunks.get(document_id, [])
         ]
+
+    async def search_similar(
+        self,
+        document_id: UUID,
+        query_embedding: Sequence[float],
+        *,
+        embedding_model: str,
+        limit: int,
+    ) -> Sequence[VectorSearchResult]:
+        results: list[VectorSearchResult] = []
+        for chunk in self.chunks.get(document_id, []):
+            if chunk.embedding is None or chunk.embedding_model != embedding_model:
+                continue
+            denominator = sqrt(sum(value * value for value in chunk.embedding)) * sqrt(
+                sum(value * value for value in query_embedding)
+            )
+            relevance = (
+                sum(
+                    left * right
+                    for left, right in zip(chunk.embedding, query_embedding, strict=True)
+                )
+                / denominator
+                if denominator
+                else 0.0
+            )
+            results.append(
+                VectorSearchResult(
+                    id=uuid5(NAMESPACE_URL, f"{document_id}:{chunk.chunk_index}"),
+                    chunk_index=chunk.chunk_index,
+                    page_number=chunk.page_number,
+                    text=chunk.text,
+                    relevance=relevance,
+                )
+            )
+        return sorted(results, key=lambda item: item.relevance, reverse=True)[:limit]
 
     def _replace(
         self,

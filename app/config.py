@@ -59,6 +59,9 @@ class Settings(BaseSettings):
     llm_api_key: SecretStr = SecretStr("")
     llm_model: str = "gpt-4o-mini"
     llm_timeout_seconds: float = Field(default=60, gt=0, le=300)
+    embedding_model: str = "text-embedding-3-small"
+    embedding_batch_size: int = Field(default=32, ge=1, le=2048)
+    rag_top_k: int = Field(default=5, ge=2, le=20)
 
     @property
     def upload_max_size_bytes(self) -> int:

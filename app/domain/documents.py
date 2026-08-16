@@ -65,6 +65,19 @@ class TextChunk:
     text: str
     char_start: int
     char_end: int
+    embedding: list[float] | None = None
+    embedding_model: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class VectorSearchResult:
+    """Фрагмент, найденный по близости векторов."""
+
+    id: UUID
+    chunk_index: int
+    page_number: int
+    text: str
+    relevance: float
 
 
 class AsyncFileReader(Protocol):
@@ -115,6 +128,20 @@ class DocumentChunker(Protocol):
         ...
 
 
+class EmbeddingProvider(Protocol):
+    """Провайдер векторных представлений текста."""
+
+    model: str
+
+    async def embed_documents(self, texts: Sequence[str]) -> Sequence[Sequence[float]]:
+        """Построить векторы фрагментов документа."""
+        ...
+
+    async def embed_query(self, text: str) -> Sequence[float]:
+        """Построить вектор пользовательского запроса."""
+        ...
+
+
 class DocumentRepository(Protocol):
     """Хранилище метаданных документов."""
 
@@ -149,4 +176,15 @@ class DocumentRepository(Protocol):
 
     async def list_analysis_chunks(self, document_id: UUID) -> Sequence[AnalysisChunk]:
         """Вернуть фрагменты документа для анализа."""
+        ...
+
+    async def search_similar(
+        self,
+        document_id: UUID,
+        query_embedding: Sequence[float],
+        *,
+        embedding_model: str,
+        limit: int,
+    ) -> Sequence[VectorSearchResult]:
+        """Найти ближайшие фрагменты одного документа."""
         ...

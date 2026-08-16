@@ -9,6 +9,7 @@ from app.domain.exceptions import DocumentTextMissingError
 from app.infrastructure.document_storage import LocalDocumentStorage
 from tests.fakes import InMemoryDocumentRepository
 from tests.test_document_storage import PDF_CONTENT, MemoryReader
+from tests.test_vector_search import FakeEmbeddingProvider
 
 
 class StaticExtractor:
@@ -93,3 +94,22 @@ async def test_processing_stores_clear_failure(tmp_path: Path) -> None:
     assert updated.error_message == (
         "PDF не содержит извлекаемого текста. OCR сканов не поддерживается"
     )
+
+
+async def test_processing_adds_embeddings_to_chunks(tmp_path: Path) -> None:
+    repository = InMemoryDocumentRepository()
+    storage = LocalDocumentStorage(tmp_path)
+    document = await upload_document(repository, storage)
+    processor = DocumentProcessingService(
+        repository,
+        storage,
+        StaticExtractor([ExtractedPage(page_number=1, text="Цена контракта")]),
+        MeaningfulTextChunker(max_chars=100, overlap_chars=10),
+        FakeEmbeddingProvider(),
+    )
+
+    await processor.process(document.id)
+
+    chunk = repository.chunks[document.id][0]
+    assert chunk.embedding == [1.0, 0.0]
+    assert chunk.embedding_model == "fake-embedding"
