@@ -25,7 +25,7 @@ class OpenAICompatibleEmbeddingProvider:
             api_key=api_key,
             base_url=base_url,
             timeout=timeout,
-            max_retries=1,
+            max_retries=3,
         )
 
     async def embed_documents(self, texts: Sequence[str]) -> Sequence[Sequence[float]]:

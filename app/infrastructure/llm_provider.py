@@ -1,5 +1,6 @@
 """OpenAI-совместимый провайдер структурированного анализа."""
 
+import json
 from collections.abc import Sequence
 
 from openai import AsyncOpenAI, OpenAIError
@@ -9,6 +10,21 @@ from app.domain.documents import VectorSearchResult
 from app.domain.exceptions import InvalidProviderResponseError, ProviderUnavailableError
 from app.domain.rag import ANSWER_NOT_FOUND, GroundedAnswerDraft
 from app.domain.tender import NOT_FOUND, AnalysisChunk, TenderCard
+
+
+def normalize_json_content(content: str) -> str:
+    """Убрать необязательную Markdown-обёртку вокруг JSON."""
+    normalized = content.strip()
+    if normalized.startswith("```") and normalized.endswith("```"):
+        first_line_end = normalized.find("\n")
+        if first_line_end != -1:
+            normalized = normalized[first_line_end + 1 : -3].strip()
+    return normalized
+
+
+def schema_instruction(schema: object) -> str:
+    """Сериализовать схему для провайдеров, игнорирующих response_format."""
+    return json.dumps(schema, ensure_ascii=False, separators=(",", ":"))
 
 
 class OpenAICompatibleTenderProvider:
@@ -29,10 +45,11 @@ class OpenAICompatibleTenderProvider:
             api_key=api_key,
             base_url=base_url,
             timeout=timeout,
-            max_retries=1,
+            max_retries=3,
         )
 
     async def analyze(self, chunks: Sequence[AnalysisChunk]) -> TenderCard:
+        card_schema = TenderCard.model_json_schema()
         context = "\n\n".join(
             f"[ФРАГМЕНТ {chunk.chunk_index}; СТРАНИЦА {chunk.page_number}]\n{chunk.text}"
             for chunk in chunks
@@ -48,7 +65,9 @@ class OpenAICompatibleTenderProvider:
                             "Извлеки карточку тендера только из переданных фрагментов. "
                             f"Если значение отсутствует, используй строку «{NOT_FOUND}». "
                             "Для найденных значений приводи короткие точные цитаты. "
-                            "Не добавляй сведения, которых нет в контексте."
+                            "Не добавляй сведения, которых нет в контексте. "
+                            "Верни только JSON без Markdown, строго соответствующий схеме: "
+                            f"{schema_instruction(card_schema)}"
                         ),
                     },
                     {"role": "user", "content": context},
@@ -58,7 +77,7 @@ class OpenAICompatibleTenderProvider:
                     "json_schema": {
                         "name": "tender_card",
                         "strict": True,
-                        "schema": TenderCard.model_json_schema(),
+                        "schema": card_schema,
                     },
                 },
             )
@@ -75,7 +94,7 @@ class OpenAICompatibleTenderProvider:
                 code="analysis_response_empty",
             )
         try:
-            return TenderCard.model_validate_json(content)
+            return TenderCard.model_validate_json(normalize_json_content(content))
         except ValidationError as error:
             raise InvalidProviderResponseError(
                 "Провайдер вернул ответ неверного формата",
@@ -88,6 +107,7 @@ class OpenAICompatibleTenderProvider:
         chunks: Sequence[VectorSearchResult],
     ) -> GroundedAnswerDraft:
         """Ответить только по контексту семантического поиска."""
+        answer_schema = GroundedAnswerDraft.model_json_schema()
         context = "\n\n".join(
             (
                 f"[ИСТОЧНИК {position}; СТРАНИЦА {chunk.page_number}; "
@@ -106,7 +126,9 @@ class OpenAICompatibleTenderProvider:
                             "Ответь на вопрос только по переданным источникам. "
                             "Не используй внешние знания и не придумывай факты. "
                             "Если контекста недостаточно, установи context_sufficient=false "
-                            f"и верни точную строку «{ANSWER_NOT_FOUND}»."
+                            f"и верни точную строку «{ANSWER_NOT_FOUND}». "
+                            "Верни только JSON без Markdown, строго соответствующий схеме: "
+                            f"{schema_instruction(answer_schema)}"
                         ),
                     },
                     {
@@ -119,7 +141,7 @@ class OpenAICompatibleTenderProvider:
                     "json_schema": {
                         "name": "grounded_answer",
                         "strict": True,
-                        "schema": GroundedAnswerDraft.model_json_schema(),
+                        "schema": answer_schema,
                     },
                 },
             )
@@ -136,7 +158,7 @@ class OpenAICompatibleTenderProvider:
                 code="answer_response_empty",
             )
         try:
-            return GroundedAnswerDraft.model_validate_json(content)
+            return GroundedAnswerDraft.model_validate_json(normalize_json_content(content))
         except ValidationError as error:
             raise InvalidProviderResponseError(
                 "Провайдер вернул ответ неверного формата",
