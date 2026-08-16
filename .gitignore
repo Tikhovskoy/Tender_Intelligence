@@ -20,6 +20,7 @@ dist/
 
 # Проверки и отчёты
 .pytest_cache/
+.pytest-tmp/
 .mypy_cache/
 .ruff_cache/
 .coverage

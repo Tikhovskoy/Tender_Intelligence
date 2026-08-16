@@ -1,0 +1,49 @@
+name: Проверки качества
+
+on:
+  push:
+    branches:
+      - main
+      - "feature/**"
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Python 3.12
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Получить исходный код
+        uses: actions/checkout@v6
+
+      - name: Настроить Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Установить зависимости
+        run: python -m pip install --editable ".[dev]"
+
+      - name: Проверить линтером
+        run: ruff check .
+
+      - name: Проверить форматирование
+        run: ruff format --check .
+
+      - name: Проверить типы
+        run: mypy app tests migrations
+
+      - name: Запустить тесты
+        run: pytest

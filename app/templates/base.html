@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Анализ тендерной документации с подтверждёнными источниками">
+    <title>{% block title %}Tender Intelligence{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}">
+    <script src="{{ url_for('static', path='/vendor/htmx-2.0.10.min.js') }}" defer></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container nav-row">
+        <a class="brand" href="/" aria-label="Tender Intelligence — на главную">
+          <span class="brand-mark" aria-hidden="true">TI</span>
+          <span>
+            <strong>Tender Intelligence</strong>
+            <small>Анализ тендерной документации</small>
+          </span>
+        </a>
+        <a class="nav-link" href="/docs">API</a>
+      </div>
+    </header>
+    <main class="container page-content">
+      {% block content %}{% endblock %}
+    </main>
+    <footer class="site-footer">
+      <div class="container">Данные ответа всегда сопровождаются ссылками на страницы документа.</div>
+    </footer>
+  </body>
+</html>

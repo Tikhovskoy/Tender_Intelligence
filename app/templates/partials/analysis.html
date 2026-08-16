@@ -1,0 +1,40 @@
+<div class="analysis-card">
+  {% set text_fields = [
+    ("Наименование закупки", analysis.procurement_name),
+    ("Заказчик", analysis.customer),
+    ("Сумма контракта", analysis.contract_amount),
+    ("Валюта", analysis.currency),
+    ("Сроки выполнения", analysis.execution_period)
+  ] %}
+  <div class="facts-grid">
+    {% for label, field in text_fields %}
+      <article class="fact-item">
+        <span class="fact-label">{{ label }}</span>
+        <strong>{{ field.value }}</strong>
+        {% for source in field.sources %}
+          <span class="source-inline">стр. {{ source.page_number }} · «{{ source.quote }}»</span>
+        {% endfor %}
+      </article>
+    {% endfor %}
+  </div>
+  <div class="analysis-columns">
+    {% for label, field in [("Требования к исполнителю", analysis.contractor_requirements), ("Штрафы и санкции", analysis.penalties)] %}
+      <article class="list-card">
+        <h3>{{ label }}</h3>
+        <ul>
+          {% for item in field.items %}<li>{{ item }}</li>{% endfor %}
+        </ul>
+        {% for source in field.sources %}
+          <span class="source-inline">стр. {{ source.page_number }} · «{{ source.quote }}»</span>
+        {% endfor %}
+      </article>
+    {% endfor %}
+  </div>
+  <article class="summary-card">
+    <span class="fact-label">Краткое резюме</span>
+    <p>{{ analysis.summary.value }}</p>
+    {% for source in analysis.summary.sources %}
+      <span class="source-inline">стр. {{ source.page_number }} · «{{ source.quote }}»</span>
+    {% endfor %}
+  </article>
+</div>
