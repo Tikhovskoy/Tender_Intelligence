@@ -137,3 +137,5 @@ ruff format --check .
 mypy app tests migrations
 pytest
 ```
+
+Те же проверки автоматически выполняются в GitHub Actions при отправке изменений в `main`, ветки `feature/**` и в pull request к `main`.
