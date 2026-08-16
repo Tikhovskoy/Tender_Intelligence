@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}{{ document.original_filename }} — Tender Intelligence{% endblock %}
+
+{% block content %}
+  <a class="back-link" href="/">← Все документы</a>
+  <section class="document-header">
+    <div>
+      <span class="eyebrow">Тендерная документация</span>
+      <h1>{{ document.original_filename }}</h1>
+      <div class="document-meta large">
+        <span>{{ document.size_bytes | file_size }}</span>
+        <span>Загружен {{ document.created_at | date_time }}</span>
+        {% if document.page_count %}<span>{{ document.page_count | page_count }}</span>{% endif %}
+      </div>
+    </div>
+  </section>
+
+  {% include "partials/status.html" %}
+
+  <section class="section-block" aria-labelledby="analysis-heading">
+    <div class="section-heading action-heading">
+      <div><span class="eyebrow">Основные сведения</span><h2 id="analysis-heading">Карточка тендера</h2></div>
+      {% if document.status.value == "ready" and not analysis %}
+        <button
+          class="button button-secondary"
+          hx-post="/documents/{{ document.id }}/analysis"
+          hx-target="#analysis-content"
+          hx-swap="innerHTML"
+          hx-indicator="#analysis-indicator"
+        >
+          Сформировать карточку
+          <span id="analysis-indicator" class="htmx-indicator spinner spinner-dark"></span>
+        </button>
+      {% endif %}
+    </div>
+    <div id="analysis-content">
+      {% if analysis %}
+        {% include "partials/analysis.html" %}
+      {% elif document.status.value == "ready" %}
+        <div class="empty-state compact"><p>Карточка ещё не сформирована.</p></div>
+      {% else %}
+        <div class="empty-state compact"><p>Карточка станет доступна после обработки документа.</p></div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="section-block questions-section" aria-labelledby="questions-heading">
+    <div class="section-heading">
+      <div><span class="eyebrow">Поиск по документу</span><h2 id="questions-heading">Вопросы и ответы</h2></div>
+    </div>
+    {% if document.status.value == "ready" %}
+      <form
+        class="question-form"
+        hx-post="/documents/{{ document.id }}/questions"
+        hx-target="#answers"
+        hx-swap="afterbegin"
+        hx-indicator="#question-indicator"
+      >
+        <label for="question">Что вы хотите найти?</label>
+        <div class="question-row">
+          <textarea id="question" name="question" rows="2" maxlength="2000" required placeholder="Например: какие требования предъявляются к исполнителю?"></textarea>
+          <button class="button button-primary" type="submit">
+            Найти ответ
+            <span id="question-indicator" class="htmx-indicator spinner"></span>
+          </button>
+        </div>
+      </form>
+    {% else %}
+      <div class="empty-state compact"><p>Вопросы станут доступны после обработки документа.</p></div>
+    {% endif %}
+    <div id="answers" class="answer-list" aria-live="polite">
+      {% for answer in answers %}{% include "partials/answer.html" %}{% endfor %}
+      {% if not answers %}<div class="empty-state compact answers-empty"><p>История вопросов пока пуста.</p></div>{% endif %}
+    </div>
+  </section>
+{% endblock %}

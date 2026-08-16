@@ -1,0 +1,28 @@
+<div
+  id="document-status"
+  class="status-panel status-panel-{{ document.status.value }}"
+  {% if document.status.value in ["uploaded", "processing"] %}
+    hx-get="/documents/{{ document.id }}/status"
+    hx-trigger="every 1s"
+    hx-swap="outerHTML"
+  {% endif %}
+>
+  <div class="status-symbol" aria-hidden="true">
+    {% if document.status.value in ["uploaded", "processing"] %}<span class="spinner spinner-dark"></span>
+    {% elif document.status.value == "ready" %}✓
+    {% else %}!{% endif %}
+  </div>
+  <div>
+    <strong>
+      {% if document.status.value == "uploaded" %}Документ ожидает обработки
+      {% elif document.status.value == "processing" %}Извлекаем текст и подготавливаем поиск
+      {% elif document.status.value == "ready" %}Документ готов к работе
+      {% else %}Не удалось обработать документ{% endif %}
+    </strong>
+    <p>
+      {% if document.status.value in ["uploaded", "processing"] %}Страница обновится автоматически после завершения.
+      {% elif document.status.value == "ready" %}Можно сформировать карточку и задавать вопросы.
+      {% else %}{{ document.error_message or "Повторите загрузку или выберите другой PDF." }}{% endif %}
+    </p>
+  </div>
+</div>

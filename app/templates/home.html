@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}Документы — Tender Intelligence{% endblock %}
+
+{% block content %}
+  <section class="hero">
+    <div class="hero-copy">
+      <span class="eyebrow">Работа с тендерами</span>
+      <h1>Разберите объёмный PDF на понятные факты</h1>
+      <p>Загрузите документацию, получите структурированную карточку и задавайте вопросы с указанием страниц-источников.</p>
+    </div>
+    <div class="upload-card">
+      <form
+        class="upload-form"
+        hx-post="/documents"
+        hx-encoding="multipart/form-data"
+        hx-target="#upload-result"
+        hx-indicator="#upload-indicator"
+      >
+        <label class="file-field" for="document-file">
+          <span class="file-icon" aria-hidden="true">PDF</span>
+          <span>
+            <strong>Выберите тендерную документацию</strong>
+            <small>PDF с текстовым слоем, не более 25 МБ</small>
+          </span>
+          <input id="document-file" name="file" type="file" accept="application/pdf,.pdf" required>
+        </label>
+        <button class="button button-primary" type="submit">
+          Загрузить документ
+          <span id="upload-indicator" class="htmx-indicator spinner" aria-label="Загрузка"></span>
+        </button>
+      </form>
+      <div id="upload-result" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section class="section-block" aria-labelledby="documents-heading">
+    <div class="section-heading">
+      <div>
+        <span class="eyebrow">Рабочая область</span>
+        <h2 id="documents-heading">Загруженные документы</h2>
+      </div>
+      <span class="count-badge">{{ documents | length }}</span>
+    </div>
+    {% if documents %}
+      <div class="document-grid">
+        {% for document in documents %}
+          <a class="document-card" href="/documents/{{ document.id }}">
+            <div class="document-icon" aria-hidden="true">PDF</div>
+            <div class="document-main">
+              <h3>{{ document.original_filename }}</h3>
+              <div class="document-meta">
+                <span>{{ document.size_bytes | file_size }}</span>
+                <span>{{ document.created_at | date_time }}</span>
+                {% if document.page_count %}<span>{{ document.page_count | page_count }}</span>{% endif %}
+              </div>
+            </div>
+            <span class="status status-{{ document.status.value }}">
+              {% if document.status.value == "uploaded" %}Загружен
+              {% elif document.status.value == "processing" %}Обрабатывается
+              {% elif document.status.value == "ready" %}Готов
+              {% else %}Ошибка{% endif %}
+            </span>
+            <span class="card-arrow" aria-hidden="true">→</span>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <div class="empty-icon" aria-hidden="true">↥</div>
+        <h3>Здесь появятся ваши документы</h3>
+        <p>Загрузите первый PDF — обработка начнётся автоматически.</p>
+      </div>
+    {% endif %}
+  </section>
+{% endblock %}

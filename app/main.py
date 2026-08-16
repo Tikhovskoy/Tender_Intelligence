@@ -2,10 +2,12 @@
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import structlog
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
+from fastapi.staticfiles import StaticFiles
 
 from app import __version__
 from app.api.error_handlers import (
@@ -34,6 +36,9 @@ from app.infrastructure.embedding_provider import OpenAICompatibleEmbeddingProvi
 from app.infrastructure.llm_provider import OpenAICompatibleTenderProvider
 from app.infrastructure.pdf_text_extractor import PyMuPdfTextExtractor
 from app.logging_config import configure_logging
+from app.web.routes import router as web_router
+
+STATIC_PATH = Path(__file__).resolve().parent / "static"
 
 
 def create_app(
@@ -149,6 +154,8 @@ def create_app(
     application.add_exception_handler(RequestValidationError, validation_error_handler)
     application.add_exception_handler(Exception, unexpected_error_handler)
     application.include_router(router)
+    application.mount("/static", StaticFiles(directory=STATIC_PATH), name="static")
+    application.include_router(web_router)
     return application
 
 

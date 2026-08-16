@@ -1,0 +1,21 @@
+<article class="answer-card">
+  <div class="answer-meta">
+    <span>{{ answer.created_at | date_time }}</span>
+    {% if answer.context_sufficient %}<span class="answer-state">Подтверждено источниками</span>{% endif %}
+  </div>
+  <h3>{{ answer.question }}</h3>
+  <p class="answer-text">{{ answer.answer }}</p>
+  {% if answer.sources %}
+    <details class="sources">
+      <summary>Источники ответа — {{ answer.sources | length }}</summary>
+      <div class="source-list">
+        {% for source in answer.sources %}
+          <blockquote>
+            <div><strong>Страница {{ source.page_number }}</strong><span>{{ source.relevance | relevance_percent }}% релевантности</span></div>
+            <p>{{ source.quote }}</p>
+          </blockquote>
+        {% endfor %}
+      </div>
+    </details>
+  {% endif %}
+</article>
