@@ -28,3 +28,19 @@ class DocumentProcessingError(ApplicationError):
 
 class DocumentTextMissingError(DocumentProcessingError):
     """В документе отсутствует извлекаемый текстовый слой."""
+
+
+class DocumentNotReadyError(ApplicationError):
+    """Документ ещё не подготовлен для анализа."""
+
+
+class AnalysisNotFoundError(ApplicationError):
+    """Карточка документа ещё не сформирована."""
+
+
+class ProviderUnavailableError(ApplicationError):
+    """Внешний провайдер недоступен или не настроен."""
+
+
+class InvalidProviderResponseError(ApplicationError):
+    """Провайдер вернул ответ, не соответствующий контракту."""

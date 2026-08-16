@@ -9,9 +9,13 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.domain.exceptions import (
+    AnalysisNotFoundError,
     ApplicationError,
     DocumentNotFoundError,
+    DocumentNotReadyError,
     FileTooLargeError,
+    InvalidProviderResponseError,
+    ProviderUnavailableError,
 )
 
 logger = structlog.get_logger(__name__)
@@ -26,8 +30,14 @@ async def application_error_handler(request: Request, exc: Exception) -> JSONRes
     application_error = cast(ApplicationError, exc)
     await logger.awarning("application_error", error_code=application_error.code)
     status_code = status.HTTP_400_BAD_REQUEST
-    if isinstance(application_error, DocumentNotFoundError):
+    if isinstance(application_error, (AnalysisNotFoundError, DocumentNotFoundError)):
         status_code = status.HTTP_404_NOT_FOUND
+    elif isinstance(application_error, DocumentNotReadyError):
+        status_code = status.HTTP_409_CONFLICT
+    elif isinstance(application_error, InvalidProviderResponseError):
+        status_code = status.HTTP_502_BAD_GATEWAY
+    elif isinstance(application_error, ProviderUnavailableError):
+        status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     elif isinstance(application_error, FileTooLargeError):
         status_code = status.HTTP_413_CONTENT_TOO_LARGE
     return JSONResponse(

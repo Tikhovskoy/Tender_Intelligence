@@ -12,6 +12,7 @@ from app.domain.documents import (
     StoredDocument,
     TextChunk,
 )
+from app.domain.tender import AnalysisChunk
 from app.infrastructure.database.connection import Database
 from app.infrastructure.database.models import Document, DocumentChunk, DocumentPage
 
@@ -128,6 +129,25 @@ class SqlAlchemyDocumentRepository:
             model.error_code = code
             model.error_message = message
             await session.commit()
+
+    async def list_analysis_chunks(self, document_id: UUID) -> Sequence[AnalysisChunk]:
+        """Вернуть фрагменты в порядке следования по документу."""
+        statement = (
+            select(
+                DocumentChunk.chunk_index,
+                DocumentPage.page_number,
+                DocumentChunk.text,
+            )
+            .join(DocumentPage, DocumentPage.id == DocumentChunk.page_id)
+            .where(DocumentChunk.document_id == document_id)
+            .order_by(DocumentChunk.chunk_index)
+        )
+        async with self.database.session() as session:
+            rows = (await session.execute(statement)).all()
+        return [
+            AnalysisChunk(chunk_index=row.chunk_index, page_number=row.page_number, text=row.text)
+            for row in rows
+        ]
 
     @staticmethod
     def _to_record(model: Document) -> DocumentRecord:

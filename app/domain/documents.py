@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Protocol
 from uuid import UUID
 
+from app.domain.tender import AnalysisChunk
+
 
 class DocumentStatus(StrEnum):
     """Этап обработки загруженного документа."""
@@ -143,4 +145,8 @@ class DocumentRepository(Protocol):
 
     async def mark_failed(self, document_id: UUID, *, code: str, message: str) -> None:
         """Сохранить понятную причину ошибки обработки."""
+        ...
+
+    async def list_analysis_chunks(self, document_id: UUID) -> Sequence[AnalysisChunk]:
+        """Вернуть фрагменты документа для анализа."""
         ...

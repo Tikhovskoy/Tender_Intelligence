@@ -16,6 +16,13 @@ class Environment(StrEnum):
     PRODUCTION = "production"
 
 
+class LlmProvider(StrEnum):
+    """Поддерживаемые варианты OpenAI-совместимого API."""
+
+    OPENAI = "openai"
+    OLLAMA = "ollama"
+
+
 class Settings(BaseSettings):
     """Настройки процесса приложения."""
 
@@ -45,6 +52,13 @@ class Settings(BaseSettings):
     upload_chunk_size_bytes: int = Field(default=1024 * 1024, ge=64 * 1024, le=8 * 1024 * 1024)
     text_chunk_size_chars: int = Field(default=1200, ge=200, le=10000)
     text_chunk_overlap_chars: int = Field(default=200, ge=0, le=2000)
+    analysis_context_max_chunks: int = Field(default=12, ge=1, le=50)
+    analysis_context_max_chars: int = Field(default=16000, ge=1000, le=100000)
+    llm_provider: LlmProvider = LlmProvider.OPENAI
+    llm_base_url: str = "https://api.openai.com/v1"
+    llm_api_key: SecretStr = SecretStr("")
+    llm_model: str = "gpt-4o-mini"
+    llm_timeout_seconds: float = Field(default=60, gt=0, le=300)
 
     @property
     def upload_max_size_bytes(self) -> int:

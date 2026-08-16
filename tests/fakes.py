@@ -9,6 +9,7 @@ from app.domain.documents import (
     StoredDocument,
     TextChunk,
 )
+from app.domain.tender import AnalysisChunk, TenderCard
 
 
 class FakeDatabase:
@@ -89,6 +90,16 @@ class InMemoryDocumentRepository:
             error_message=message,
         )
 
+    async def list_analysis_chunks(self, document_id: UUID) -> Sequence[AnalysisChunk]:
+        return [
+            AnalysisChunk(
+                chunk_index=chunk.chunk_index,
+                page_number=chunk.page_number,
+                text=chunk.text,
+            )
+            for chunk in self.chunks.get(document_id, [])
+        ]
+
     def _replace(
         self,
         document_id: UUID,
@@ -114,3 +125,27 @@ class InMemoryDocumentRepository:
                 )
                 return
         raise RuntimeError("Документ для обработки не найден")
+
+
+class InMemoryTenderAnalysisRepository:
+    """Хранилище карточек без внешней БД."""
+
+    def __init__(self) -> None:
+        self.cards: dict[UUID, TenderCard] = {}
+        self.saved_metadata: tuple[str, str, str] | None = None
+
+    async def get(self, document_id: UUID) -> TenderCard | None:
+        return self.cards.get(document_id)
+
+    async def save(
+        self,
+        document_id: UUID,
+        card: TenderCard,
+        *,
+        provider: str,
+        model: str,
+        prompt_version: str,
+    ) -> TenderCard:
+        self.cards[document_id] = card
+        self.saved_metadata = (provider, model, prompt_version)
+        return card

@@ -17,12 +17,17 @@ from app.api.middleware import request_context_middleware
 from app.api.router import router
 from app.application.document_processing import DocumentProcessingService
 from app.application.documents import DocumentService
+from app.application.tender_analysis import RelevantChunkSelector, TenderAnalysisService
 from app.application.text_chunking import MeaningfulTextChunker
-from app.config import Settings, get_settings
+from app.config import LlmProvider, Settings, get_settings
 from app.domain.exceptions import ApplicationError
 from app.infrastructure.database import Database, DatabaseGateway
 from app.infrastructure.database.document_repository import SqlAlchemyDocumentRepository
+from app.infrastructure.database.tender_analysis_repository import (
+    SqlAlchemyTenderAnalysisRepository,
+)
 from app.infrastructure.document_storage import LocalDocumentStorage
+from app.infrastructure.llm_provider import OpenAICompatibleTenderProvider
 from app.infrastructure.pdf_text_extractor import PyMuPdfTextExtractor
 from app.logging_config import configure_logging
 
@@ -36,6 +41,7 @@ def create_app(
     resolved_database = database or Database(resolved_settings)
     document_service = None
     document_processor = None
+    tender_analysis_service = None
     if isinstance(resolved_database, Database):
         document_repository = SqlAlchemyDocumentRepository(resolved_database)
         document_storage = LocalDocumentStorage(resolved_settings.storage_path)
@@ -52,6 +58,25 @@ def create_app(
             MeaningfulTextChunker(
                 max_chars=resolved_settings.text_chunk_size_chars,
                 overlap_chars=resolved_settings.text_chunk_overlap_chars,
+            ),
+        )
+        api_key = resolved_settings.llm_api_key.get_secret_value()
+        analysis_provider = None
+        if resolved_settings.llm_provider == LlmProvider.OLLAMA or api_key:
+            analysis_provider = OpenAICompatibleTenderProvider(
+                name=resolved_settings.llm_provider.value,
+                model=resolved_settings.llm_model,
+                base_url=resolved_settings.llm_base_url,
+                api_key=api_key or "ollama",
+                timeout=resolved_settings.llm_timeout_seconds,
+            )
+        tender_analysis_service = TenderAnalysisService(
+            document_repository,
+            SqlAlchemyTenderAnalysisRepository(resolved_database),
+            analysis_provider,
+            RelevantChunkSelector(
+                max_chunks=resolved_settings.analysis_context_max_chunks,
+                max_chars=resolved_settings.analysis_context_max_chars,
             ),
         )
     configure_logging(resolved_settings.log_level)
@@ -85,6 +110,7 @@ def create_app(
     application.state.database = resolved_database
     application.state.document_service = document_service
     application.state.document_processor = document_processor
+    application.state.tender_analysis_service = tender_analysis_service
     application.state.lifecycle_started = False
     application.state.ready = False
     application.middleware("http")(request_context_middleware)
