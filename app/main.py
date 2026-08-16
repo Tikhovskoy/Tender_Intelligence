@@ -15,12 +15,14 @@ from app.api.error_handlers import (
 )
 from app.api.middleware import request_context_middleware
 from app.api.router import router
+from app.application.document_processing import DocumentProcessingService
 from app.application.documents import DocumentService
 from app.config import Settings, get_settings
 from app.domain.exceptions import ApplicationError
 from app.infrastructure.database import Database, DatabaseGateway
 from app.infrastructure.database.document_repository import SqlAlchemyDocumentRepository
 from app.infrastructure.document_storage import LocalDocumentStorage
+from app.infrastructure.pdf_text_extractor import PyMuPdfTextExtractor
 from app.logging_config import configure_logging
 
 
@@ -32,12 +34,20 @@ def create_app(
     resolved_settings = settings or get_settings()
     resolved_database = database or Database(resolved_settings)
     document_service = None
+    document_processor = None
     if isinstance(resolved_database, Database):
+        document_repository = SqlAlchemyDocumentRepository(resolved_database)
+        document_storage = LocalDocumentStorage(resolved_settings.storage_path)
         document_service = DocumentService(
-            SqlAlchemyDocumentRepository(resolved_database),
-            LocalDocumentStorage(resolved_settings.storage_path),
+            document_repository,
+            document_storage,
             max_size_bytes=resolved_settings.upload_max_size_bytes,
             chunk_size_bytes=resolved_settings.upload_chunk_size_bytes,
+        )
+        document_processor = DocumentProcessingService(
+            document_repository,
+            document_storage,
+            PyMuPdfTextExtractor(),
         )
     configure_logging(resolved_settings.log_level)
     logger = structlog.get_logger(__name__)
@@ -69,6 +79,7 @@ def create_app(
     application.state.settings = resolved_settings
     application.state.database = resolved_database
     application.state.document_service = document_service
+    application.state.document_processor = document_processor
     application.state.lifecycle_started = False
     application.state.ready = False
     application.middleware("http")(request_context_middleware)

@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from app.domain.documents import DocumentRecord, DocumentStatus, StoredDocument
+from app.domain.documents import DocumentRecord, DocumentStatus, ExtractedPage, StoredDocument
 
 
 class FakeDatabase:
@@ -28,14 +28,17 @@ class InMemoryDocumentRepository:
 
     def __init__(self) -> None:
         self.records: list[DocumentRecord] = []
+        self.pages: dict[UUID, list[ExtractedPage]] = {}
 
     async def create(self, document: StoredDocument) -> DocumentRecord:
         now = datetime.now(UTC)
         record = DocumentRecord(
             id=uuid4(),
             original_filename=document.original_filename,
+            stored_filename=document.stored_filename,
             content_type=document.content_type,
             size_bytes=document.size_bytes,
+            sha256=document.sha256,
             status=DocumentStatus.UPLOADED,
             page_count=None,
             error_message=None,
@@ -50,3 +53,50 @@ class InMemoryDocumentRepository:
 
     async def list(self, *, limit: int, offset: int) -> Sequence[DocumentRecord]:
         return self.records[offset : offset + limit]
+
+    async def mark_processing(self, document_id: UUID) -> None:
+        self._replace(document_id, status=DocumentStatus.PROCESSING)
+        self.pages.pop(document_id, None)
+
+    async def save_pages(self, document_id: UUID, pages: Sequence[ExtractedPage]) -> None:
+        self.pages[document_id] = list(pages)
+        self._replace(
+            document_id,
+            status=DocumentStatus.READY,
+            page_count=len(pages),
+            error_message=None,
+        )
+
+    async def mark_failed(self, document_id: UUID, *, code: str, message: str) -> None:
+        self._replace(
+            document_id,
+            status=DocumentStatus.FAILED,
+            page_count=None,
+            error_message=message,
+        )
+
+    def _replace(
+        self,
+        document_id: UUID,
+        *,
+        status: DocumentStatus,
+        page_count: int | None = None,
+        error_message: str | None = None,
+    ) -> None:
+        for index, record in enumerate(self.records):
+            if record.id == document_id:
+                self.records[index] = DocumentRecord(
+                    id=record.id,
+                    original_filename=record.original_filename,
+                    stored_filename=record.stored_filename,
+                    content_type=record.content_type,
+                    size_bytes=record.size_bytes,
+                    sha256=record.sha256,
+                    status=status,
+                    page_count=page_count,
+                    error_message=error_message,
+                    created_at=record.created_at,
+                    updated_at=datetime.now(UTC),
+                )
+                return
+        raise RuntimeError("Документ для обработки не найден")

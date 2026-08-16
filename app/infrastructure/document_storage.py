@@ -76,9 +76,16 @@ class LocalDocumentStorage:
 
     async def delete(self, stored_filename: str) -> None:
         """Безопасно удалить файл по внутреннему имени."""
+        await self._unlink(self.resolve_path(stored_filename))
+
+    def resolve_path(self, stored_filename: str) -> Path:
+        """Вернуть путь, не допускающий выход за корень хранилища."""
         if Path(stored_filename).name != stored_filename:
             raise ValueError("Некорректное внутреннее имя файла")
-        await self._unlink(self.root / stored_filename)
+        path = (self.root / stored_filename).resolve()
+        if path.parent != self.root:
+            raise ValueError("Некорректное внутреннее имя файла")
+        return path
 
     @staticmethod
     async def _unlink(path: Path) -> None:

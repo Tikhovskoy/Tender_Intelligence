@@ -3,15 +3,20 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Query, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Query, UploadFile, status
 
-from app.api.dependencies import get_document_service
+from app.api.dependencies import get_document_processor, get_document_service
 from app.api.schemas import DocumentListResponse, DocumentResponse, ErrorResponse
+from app.application.document_processing import DocumentProcessingService
 from app.application.documents import DocumentService
 
 router = APIRouter(prefix="/api/v1/documents", tags=["Документы"])
 
 DocumentServiceDependency = Annotated[DocumentService, Depends(get_document_service)]
+DocumentProcessorDependency = Annotated[
+    DocumentProcessingService | None,
+    Depends(get_document_processor),
+]
 
 
 @router.post(
@@ -26,6 +31,8 @@ DocumentServiceDependency = Annotated[DocumentService, Depends(get_document_serv
 async def upload_document(
     file: Annotated[UploadFile, File(description="PDF-документ")],
     service: DocumentServiceDependency,
+    processor: DocumentProcessorDependency,
+    background_tasks: BackgroundTasks,
 ) -> DocumentResponse:
     """Загрузить PDF и зарегистрировать его для обработки."""
     record = await service.upload(
@@ -33,6 +40,8 @@ async def upload_document(
         filename=file.filename,
         content_type=file.content_type,
     )
+    if processor is not None:
+        background_tasks.add_task(processor.process, record.id)
     return DocumentResponse.model_validate(record)
 
 

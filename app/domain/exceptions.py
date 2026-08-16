@@ -20,3 +20,11 @@ class FileTooLargeError(ApplicationError):
 
 class DocumentNotFoundError(ApplicationError):
     """Документ с указанным идентификатором не найден."""
+
+
+class DocumentProcessingError(ApplicationError):
+    """Документ невозможно обработать."""
+
+
+class DocumentTextMissingError(DocumentProcessingError):
+    """В документе отсутствует извлекаемый текстовый слой."""

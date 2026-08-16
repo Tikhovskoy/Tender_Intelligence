@@ -4,10 +4,13 @@ from uuid import uuid4
 from fastapi import FastAPI
 from httpx import AsyncClient
 
-from app.api.dependencies import get_document_service
+from app.api.dependencies import get_document_processor, get_document_service
+from app.application.document_processing import DocumentProcessingService
 from app.application.documents import DocumentService
+from app.domain.documents import ExtractedPage
 from app.infrastructure.document_storage import LocalDocumentStorage
 from tests.fakes import InMemoryDocumentRepository
+from tests.test_document_processing import StaticExtractor
 from tests.test_document_storage import PDF_CONTENT
 
 
@@ -95,3 +98,37 @@ async def test_api_returns_not_found(
 
     assert response.status_code == 404
     assert response.json()["code"] == "document_not_found"
+
+
+async def test_upload_starts_background_processing(
+    application: FastAPI,
+    client: AsyncClient,
+    tmp_path: Path,
+) -> None:
+    repository = InMemoryDocumentRepository()
+    storage = LocalDocumentStorage(tmp_path)
+    service = DocumentService(
+        repository,
+        storage,
+        max_size_bytes=1024,
+        chunk_size_bytes=8,
+    )
+    processor = DocumentProcessingService(
+        repository,
+        storage,
+        StaticExtractor([ExtractedPage(page_number=1, text="Условия контракта")]),
+    )
+    application.dependency_overrides[get_document_service] = lambda: service
+    application.dependency_overrides[get_document_processor] = lambda: processor
+
+    upload_response = await client.post(
+        "/api/v1/documents",
+        files={"file": ("тендер.pdf", PDF_CONTENT, "application/pdf")},
+    )
+    document_id = upload_response.json()["id"]
+    get_response = await client.get(f"/api/v1/documents/{document_id}")
+
+    assert upload_response.status_code == 201
+    assert upload_response.json()["status"] == "uploaded"
+    assert get_response.json()["status"] == "ready"
+    assert get_response.json()["page_count"] == 1

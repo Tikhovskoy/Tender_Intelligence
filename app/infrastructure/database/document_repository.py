@@ -3,11 +3,11 @@
 from collections.abc import Sequence
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
-from app.domain.documents import DocumentRecord, StoredDocument
+from app.domain.documents import DocumentRecord, DocumentStatus, ExtractedPage, StoredDocument
 from app.infrastructure.database.connection import Database
-from app.infrastructure.database.models import Document
+from app.infrastructure.database.models import Document, DocumentPage
 
 
 class SqlAlchemyDocumentRepository:
@@ -50,13 +50,62 @@ class SqlAlchemyDocumentRepository:
             models = result.all()
         return [self._to_record(model) for model in models]
 
+    async def mark_processing(self, document_id: UUID) -> None:
+        """Начать обработку и очистить результат предыдущей попытки."""
+        async with self.database.session() as session:
+            model = await session.get(Document, document_id)
+            if model is None:
+                raise RuntimeError("Документ для обработки не найден")
+            await session.execute(
+                delete(DocumentPage).where(DocumentPage.document_id == document_id)
+            )
+            model.status = DocumentStatus.PROCESSING
+            model.page_count = None
+            model.error_code = None
+            model.error_message = None
+            await session.commit()
+
+    async def save_pages(self, document_id: UUID, pages: Sequence[ExtractedPage]) -> None:
+        """Сохранить страницы и выставить итоговый статус ready."""
+        async with self.database.session() as session:
+            model = await session.get(Document, document_id)
+            if model is None:
+                raise RuntimeError("Документ для обработки не найден")
+            session.add_all(
+                DocumentPage(
+                    document_id=document_id,
+                    page_number=page.page_number,
+                    text=page.text,
+                )
+                for page in pages
+            )
+            model.status = DocumentStatus.READY
+            model.page_count = len(pages)
+            model.error_code = None
+            model.error_message = None
+            await session.commit()
+
+    async def mark_failed(self, document_id: UUID, *, code: str, message: str) -> None:
+        """Сохранить ошибку обработки без технических деталей."""
+        async with self.database.session() as session:
+            model = await session.get(Document, document_id)
+            if model is None:
+                raise RuntimeError("Документ для обработки не найден")
+            model.status = DocumentStatus.FAILED
+            model.page_count = None
+            model.error_code = code
+            model.error_message = message
+            await session.commit()
+
     @staticmethod
     def _to_record(model: Document) -> DocumentRecord:
         return DocumentRecord(
             id=model.id,
             original_filename=model.original_filename,
+            stored_filename=model.stored_filename,
             content_type=model.content_type,
             size_bytes=model.size_bytes,
+            sha256=model.sha256,
             status=model.status,
             page_count=model.page_count,
             error_message=model.error_message,
