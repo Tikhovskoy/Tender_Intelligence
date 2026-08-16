@@ -108,6 +108,7 @@ class InMemoryDocumentRepository:
         document_id: UUID,
         query_embedding: Sequence[float],
         *,
+        query_text: str,
         embedding_model: str,
         limit: int,
     ) -> Sequence[VectorSearchResult]:

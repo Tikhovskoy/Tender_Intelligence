@@ -3,7 +3,7 @@
 from collections.abc import Sequence
 from uuid import UUID
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 
 from app.domain.documents import (
     DocumentRecord,
@@ -157,11 +157,17 @@ class SqlAlchemyDocumentRepository:
         document_id: UUID,
         query_embedding: Sequence[float],
         *,
+        query_text: str,
         embedding_model: str,
         limit: int,
     ) -> Sequence[VectorSearchResult]:
-        """Выполнить cosine-поиск только по чанкам выбранного документа."""
+        """Совместить cosine-поиск с полнотекстовым поиском на русском."""
         distance = DocumentChunk.embedding.cosine_distance(list(query_embedding)).label("distance")
+        lexical_rank = func.ts_rank_cd(
+            func.to_tsvector("russian", DocumentChunk.text),
+            func.websearch_to_tsquery("russian", query_text),
+        )
+        combined_rank = distance - lexical_rank * 2
         statement = (
             select(
                 DocumentChunk.id,
@@ -176,7 +182,7 @@ class SqlAlchemyDocumentRepository:
                 DocumentChunk.embedding.is_not(None),
                 DocumentChunk.embedding_model == embedding_model,
             )
-            .order_by(distance)
+            .order_by(combined_rank, distance)
             .limit(limit)
         )
         async with self.database.session() as session:

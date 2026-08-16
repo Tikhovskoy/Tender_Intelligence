@@ -183,8 +183,9 @@ class DocumentRepository(Protocol):
         document_id: UUID,
         query_embedding: Sequence[float],
         *,
+        query_text: str,
         embedding_model: str,
         limit: int,
     ) -> Sequence[VectorSearchResult]:
-        """Найти ближайшие фрагменты одного документа."""
+        """Найти ближайшие по смыслу и словам фрагменты одного документа."""
         ...

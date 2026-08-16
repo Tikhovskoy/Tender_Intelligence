@@ -87,9 +87,11 @@ class VectorSearchService:
                 code="embedding_provider_not_configured",
             )
         query_embedding = await self.provider.embed_query(normalized_question)
+        lexical_query = " OR ".join(sorted(self._expanded_terms(normalized_question)))
         candidates = await self.documents.search_similar(
             document_id,
             query_embedding,
+            query_text=lexical_query,
             embedding_model=self.provider.model,
             limit=max(20, self.top_k),
         )
@@ -102,9 +104,7 @@ class VectorSearchService:
         candidates: Sequence[VectorSearchResult],
     ) -> list[VectorSearchResult]:
         """Дополнить семантическую оценку точным совпадением терминов."""
-        query_terms = cls._terms(question)
-        if query_terms & cls._CONTRACTOR_TERMS:
-            query_terms |= cls._CONTRACTOR_TERMS | cls._CONTRACTOR_SYNONYMS
+        query_terms = cls._expanded_terms(question)
 
         def score(item: VectorSearchResult) -> tuple[float, float, int]:
             text_terms = cls._terms(item.text)
@@ -121,3 +121,10 @@ class VectorSearchService:
             for word in cls._WORD_PATTERN.findall(value.casefold())
             if len(word) >= 3 and word not in cls._STOP_WORDS
         }
+
+    @classmethod
+    def _expanded_terms(cls, question: str) -> set[str]:
+        terms = cls._terms(question)
+        if terms & cls._CONTRACTOR_TERMS:
+            terms |= cls._CONTRACTOR_TERMS | cls._CONTRACTOR_SYNONYMS
+        return terms
