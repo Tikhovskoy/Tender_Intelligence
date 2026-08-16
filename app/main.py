@@ -17,6 +17,7 @@ from app.api.middleware import request_context_middleware
 from app.api.router import router
 from app.application.document_processing import DocumentProcessingService
 from app.application.documents import DocumentService
+from app.application.text_chunking import MeaningfulTextChunker
 from app.config import Settings, get_settings
 from app.domain.exceptions import ApplicationError
 from app.infrastructure.database import Database, DatabaseGateway
@@ -48,6 +49,10 @@ def create_app(
             document_repository,
             document_storage,
             PyMuPdfTextExtractor(),
+            MeaningfulTextChunker(
+                max_chars=resolved_settings.text_chunk_size_chars,
+                overlap_chars=resolved_settings.text_chunk_overlap_chars,
+            ),
         )
     configure_logging(resolved_settings.log_level)
     logger = structlog.get_logger(__name__)

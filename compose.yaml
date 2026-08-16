@@ -37,6 +37,8 @@ services:
       APP_STORAGE_PATH: /data/uploads
       APP_UPLOAD_MAX_SIZE_MB: ${APP_UPLOAD_MAX_SIZE_MB:-25}
       APP_UPLOAD_CHUNK_SIZE_BYTES: ${APP_UPLOAD_CHUNK_SIZE_BYTES:-1048576}
+      APP_TEXT_CHUNK_SIZE_CHARS: ${APP_TEXT_CHUNK_SIZE_CHARS:-1200}
+      APP_TEXT_CHUNK_OVERLAP_CHARS: ${APP_TEXT_CHUNK_OVERLAP_CHARS:-200}
     depends_on:
       postgres:
         condition: service_healthy

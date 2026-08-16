@@ -7,6 +7,7 @@ from httpx import AsyncClient
 from app.api.dependencies import get_document_processor, get_document_service
 from app.application.document_processing import DocumentProcessingService
 from app.application.documents import DocumentService
+from app.application.text_chunking import MeaningfulTextChunker
 from app.domain.documents import ExtractedPage
 from app.infrastructure.document_storage import LocalDocumentStorage
 from tests.fakes import InMemoryDocumentRepository
@@ -117,6 +118,7 @@ async def test_upload_starts_background_processing(
         repository,
         storage,
         StaticExtractor([ExtractedPage(page_number=1, text="Условия контракта")]),
+        MeaningfulTextChunker(max_chars=100, overlap_chars=10),
     )
     application.dependency_overrides[get_document_service] = lambda: service
     application.dependency_overrides[get_document_processor] = lambda: processor

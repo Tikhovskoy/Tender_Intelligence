@@ -5,9 +5,15 @@ from uuid import UUID
 
 from sqlalchemy import delete, select
 
-from app.domain.documents import DocumentRecord, DocumentStatus, ExtractedPage, StoredDocument
+from app.domain.documents import (
+    DocumentRecord,
+    DocumentStatus,
+    ExtractedPage,
+    StoredDocument,
+    TextChunk,
+)
 from app.infrastructure.database.connection import Database
-from app.infrastructure.database.models import Document, DocumentPage
+from app.infrastructure.database.models import Document, DocumentChunk, DocumentPage
 
 
 class SqlAlchemyDocumentRepository:
@@ -65,20 +71,46 @@ class SqlAlchemyDocumentRepository:
             model.error_message = None
             await session.commit()
 
-    async def save_pages(self, document_id: UUID, pages: Sequence[ExtractedPage]) -> None:
-        """Сохранить страницы и выставить итоговый статус ready."""
+    async def save_content(
+        self,
+        document_id: UUID,
+        pages: Sequence[ExtractedPage],
+        chunks: Sequence[TextChunk],
+    ) -> None:
+        """Атомарно сохранить страницы, фрагменты и статус ready."""
         async with self.database.session() as session:
             model = await session.get(Document, document_id)
             if model is None:
                 raise RuntimeError("Документ для обработки не найден")
-            session.add_all(
-                DocumentPage(
+            page_models = {
+                page.page_number: DocumentPage(
                     document_id=document_id,
                     page_number=page.page_number,
                     text=page.text,
                 )
                 for page in pages
-            )
+            }
+            session.add_all(page_models.values())
+            await session.flush()
+            try:
+                session.add_all(
+                    DocumentChunk(
+                        document_id=document_id,
+                        page_id=page_models[chunk.page_number].id,
+                        chunk_index=chunk.chunk_index,
+                        text=chunk.text,
+                        char_start=chunk.char_start,
+                        char_end=chunk.char_end,
+                        attributes={
+                            "page_number": chunk.page_number,
+                            "char_start": chunk.char_start,
+                            "char_end": chunk.char_end,
+                        },
+                    )
+                    for chunk in chunks
+                )
+            except KeyError as error:
+                raise RuntimeError("Фрагмент ссылается на отсутствующую страницу") from error
             model.status = DocumentStatus.READY
             model.page_count = len(pages)
             model.error_code = None

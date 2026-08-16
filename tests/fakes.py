@@ -2,7 +2,13 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from app.domain.documents import DocumentRecord, DocumentStatus, ExtractedPage, StoredDocument
+from app.domain.documents import (
+    DocumentRecord,
+    DocumentStatus,
+    ExtractedPage,
+    StoredDocument,
+    TextChunk,
+)
 
 
 class FakeDatabase:
@@ -29,6 +35,7 @@ class InMemoryDocumentRepository:
     def __init__(self) -> None:
         self.records: list[DocumentRecord] = []
         self.pages: dict[UUID, list[ExtractedPage]] = {}
+        self.chunks: dict[UUID, list[TextChunk]] = {}
 
     async def create(self, document: StoredDocument) -> DocumentRecord:
         now = datetime.now(UTC)
@@ -57,9 +64,16 @@ class InMemoryDocumentRepository:
     async def mark_processing(self, document_id: UUID) -> None:
         self._replace(document_id, status=DocumentStatus.PROCESSING)
         self.pages.pop(document_id, None)
+        self.chunks.pop(document_id, None)
 
-    async def save_pages(self, document_id: UUID, pages: Sequence[ExtractedPage]) -> None:
+    async def save_content(
+        self,
+        document_id: UUID,
+        pages: Sequence[ExtractedPage],
+        chunks: Sequence[TextChunk],
+    ) -> None:
         self.pages[document_id] = list(pages)
+        self.chunks[document_id] = list(chunks)
         self._replace(
             document_id,
             status=DocumentStatus.READY,

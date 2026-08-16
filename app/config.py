@@ -4,7 +4,7 @@ from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -43,11 +43,20 @@ class Settings(BaseSettings):
     storage_path: Path = Path("storage/uploads")
     upload_max_size_mb: int = Field(default=25, ge=1, le=500)
     upload_chunk_size_bytes: int = Field(default=1024 * 1024, ge=64 * 1024, le=8 * 1024 * 1024)
+    text_chunk_size_chars: int = Field(default=1200, ge=200, le=10000)
+    text_chunk_overlap_chars: int = Field(default=200, ge=0, le=2000)
 
     @property
     def upload_max_size_bytes(self) -> int:
         """Вернуть ограничение размера загружаемого файла в байтах."""
         return self.upload_max_size_mb * 1024 * 1024
+
+    @model_validator(mode="after")
+    def validate_chunk_settings(self) -> "Settings":
+        """Проверить, что перекрытие меньше размера фрагмента."""
+        if self.text_chunk_overlap_chars >= self.text_chunk_size_chars:
+            raise ValueError("Перекрытие фрагментов должно быть меньше их размера")
+        return self
 
     @field_validator("log_level")
     @classmethod

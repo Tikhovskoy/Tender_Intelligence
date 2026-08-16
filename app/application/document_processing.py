@@ -4,7 +4,12 @@ from uuid import UUID
 
 import structlog
 
-from app.domain.documents import DocumentRepository, DocumentStorage, DocumentTextExtractor
+from app.domain.documents import (
+    DocumentChunker,
+    DocumentRepository,
+    DocumentStorage,
+    DocumentTextExtractor,
+)
 from app.domain.exceptions import ApplicationError
 
 logger = structlog.get_logger(__name__)
@@ -18,10 +23,12 @@ class DocumentProcessingService:
         repository: DocumentRepository,
         storage: DocumentStorage,
         extractor: DocumentTextExtractor,
+        chunker: DocumentChunker,
     ) -> None:
         self.repository = repository
         self.storage = storage
         self.extractor = extractor
+        self.chunker = chunker
 
     async def process(self, document_id: UUID) -> None:
         """Извлечь текст, не допуская падения фонового сценария."""
@@ -34,7 +41,8 @@ class DocumentProcessingService:
         try:
             path = self.storage.resolve_path(document.stored_filename)
             pages = await self.extractor.extract(path)
-            await self.repository.save_pages(document_id, pages)
+            chunks = self.chunker.split(pages)
+            await self.repository.save_content(document_id, pages, chunks)
         except ApplicationError as error:
             await self.repository.mark_failed(
                 document_id,
@@ -62,4 +70,5 @@ class DocumentProcessingService:
                 "document_processing_completed",
                 document_id=str(document_id),
                 page_count=len(pages),
+                chunk_count=len(chunks),
             )

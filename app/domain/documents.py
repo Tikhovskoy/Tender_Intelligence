@@ -54,6 +54,17 @@ class ExtractedPage:
     text: str
 
 
+@dataclass(frozen=True, slots=True)
+class TextChunk:
+    """Фрагмент текста с координатами в исходной странице."""
+
+    page_number: int
+    chunk_index: int
+    text: str
+    char_start: int
+    char_end: int
+
+
 class AsyncFileReader(Protocol):
     """Асинхронный источник содержимого файла."""
 
@@ -94,6 +105,14 @@ class DocumentTextExtractor(Protocol):
         ...
 
 
+class DocumentChunker(Protocol):
+    """Разбиение постраничного текста на фрагменты."""
+
+    def split(self, pages: Sequence[ExtractedPage]) -> Sequence[TextChunk]:
+        """Сформировать фрагменты с глобальной последовательной нумерацией."""
+        ...
+
+
 class DocumentRepository(Protocol):
     """Хранилище метаданных документов."""
 
@@ -113,8 +132,13 @@ class DocumentRepository(Protocol):
         """Отметить начало обработки документа."""
         ...
 
-    async def save_pages(self, document_id: UUID, pages: Sequence[ExtractedPage]) -> None:
-        """Сохранить страницы и завершить обработку документа."""
+    async def save_content(
+        self,
+        document_id: UUID,
+        pages: Sequence[ExtractedPage],
+        chunks: Sequence[TextChunk],
+    ) -> None:
+        """Сохранить страницы, фрагменты и завершить обработку."""
         ...
 
     async def mark_failed(self, document_id: UUID, *, code: str, message: str) -> None:

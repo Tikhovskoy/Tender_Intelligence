@@ -3,6 +3,7 @@ from pathlib import Path
 
 from app.application.document_processing import DocumentProcessingService
 from app.application.documents import DocumentService
+from app.application.text_chunking import MeaningfulTextChunker
 from app.domain.documents import DocumentRecord, ExtractedPage
 from app.domain.exceptions import DocumentTextMissingError
 from app.infrastructure.document_storage import LocalDocumentStorage
@@ -55,7 +56,12 @@ async def test_processing_saves_pages_and_sets_ready(tmp_path: Path) -> None:
         ExtractedPage(page_number=1, text="Цена контракта"),
         ExtractedPage(page_number=2, text="Срок выполнения"),
     ]
-    processor = DocumentProcessingService(repository, storage, StaticExtractor(pages))
+    processor = DocumentProcessingService(
+        repository,
+        storage,
+        StaticExtractor(pages),
+        MeaningfulTextChunker(max_chars=100, overlap_chars=10),
+    )
 
     await processor.process(document.id)
 
@@ -64,13 +70,19 @@ async def test_processing_saves_pages_and_sets_ready(tmp_path: Path) -> None:
     assert updated.status == "ready"
     assert updated.page_count == 2
     assert repository.pages[document.id] == pages
+    assert [chunk.page_number for chunk in repository.chunks[document.id]] == [1, 2]
 
 
 async def test_processing_stores_clear_failure(tmp_path: Path) -> None:
     repository = InMemoryDocumentRepository()
     storage = LocalDocumentStorage(tmp_path)
     document = await upload_document(repository, storage)
-    processor = DocumentProcessingService(repository, storage, MissingTextExtractor())
+    processor = DocumentProcessingService(
+        repository,
+        storage,
+        MissingTextExtractor(),
+        MeaningfulTextChunker(max_chars=100, overlap_chars=10),
+    )
 
     await processor.process(document.id)
 
